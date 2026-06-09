@@ -222,6 +222,56 @@ tbody tr:last-child td{border-bottom:none;}
 .footnote{margin-top:8px;font-size:12.5px;color:var(--text-soft);background:#f7f8fa;border:1px solid var(--border);border-radius:8px;padding:12px 14px;line-height:1.6;}
 .footnote b{color:var(--text);}
 
+/* ── mobile responsive ── */
+@media(max-width:700px){
+  .page{padding:16px 14px 80px;}
+  .topbar{flex-direction:column;align-items:flex-start;gap:14px;margin-bottom:16px;}
+  .title-block h1{font-size:20px;}
+  .stats{flex-wrap:wrap;gap:8px;width:100%;}
+  .stat{flex:1;min-width:70px;padding:8px 10px;}
+  .stat .num{font-size:18px;}
+  .stat .lbl{font-size:10.5px;}
+
+  .toolbar{gap:6px;}
+  .toolbar input{min-width:100%;width:100%;}
+  .toolbar select{flex:1;min-width:0;}
+  .toolbar > div{width:100%;justify-content:stretch;}
+  .toolbar > div .btn{flex:1;justify-content:center;}
+
+  /* hide desktop table, show cards */
+  .sheet{display:none;}
+  .cards{display:flex;flex-direction:column;gap:10px;}
+
+  .card{
+    background:var(--surface);border:1px solid var(--border-strong);
+    border-radius:12px;padding:14px 16px;
+    box-shadow:0 1px 3px rgba(20,24,33,.06);
+  }
+  .card-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px;}
+  .card-name{font-size:14px;font-weight:700;color:#1c212b;line-height:1.4;flex:1;}
+  .card-id{font-family:var(--mono);font-size:11px;color:var(--text-soft);margin-top:2px;}
+  .card-badges{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
+  .card-meta{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;font-size:12px;color:var(--text-soft);margin-bottom:10px;}
+  .card-meta-item{display:flex;flex-direction:column;gap:2px;}
+  .card-meta-lbl{font-size:10.5px;font-weight:600;color:#9aa2b0;text-transform:uppercase;letter-spacing:.03em;}
+  .card-meta-val{font-size:12.5px;color:var(--text);font-weight:500;}
+  .card-prog{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+  .card-prog .prog-track{flex:1;}
+  .card-notes{font-size:12px;color:var(--text-soft);line-height:1.5;border-top:1px solid var(--grid-line);padding-top:8px;margin-bottom:10px;}
+  .card-actions{display:flex;gap:8px;border-top:1px solid var(--grid-line);padding-top:10px;}
+  .card-actions .btn{flex:1;justify-content:center;height:36px;font-size:13px;}
+  .card-btn-edit{background:#e3eefc;color:#1d5fbf;border-color:#b8d3f5;}
+  .card-btn-del{background:var(--block-bg);color:var(--block-fg);border-color:#f0c0c0;}
+
+  .setup{padding:20px 16px;}
+  .form-grid{grid-template-columns:1fr;}
+  .form-full{grid-column:1;}
+}
+
+@media(min-width:701px){
+  .cards{display:none;}
+}
+
 /* ── loading overlay ── */
 #loading{position:fixed;inset:0;background:rgba(15,20,30,.35);z-index:300;display:none;align-items:center;justify-content:center;}
 .spinner{width:36px;height:36px;border:3px solid rgba(255,255,255,.2);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;}
@@ -304,6 +354,9 @@ tbody tr:last-child td{border-bottom:none;}
       </table>
     </div>
   </div>
+
+  <!-- MOBILE CARDS -->
+  <div class="cards" id="cards"></div>
 
   <!-- SETUP SECTION (from design) -->
   <div class="setup">
@@ -590,6 +643,45 @@ function render(){
     <div class="stat prog"><div class="num">${prog}</div><div class="lbl">قيد التنفيذ</div></div>
     <div class="stat done"><div class="num">${done}</div><div class="lbl">مكتملة</div></div>
     <div class="stat block"><div class="num">${block}</div><div class="lbl">محظورة</div></div>`;
+
+  // mobile cards
+  const cards = document.getElementById('cards');
+  if(!list.length){
+    cards.innerHTML = `<div class="card"><p style="text-align:center;color:var(--text-soft);margin:0;font-size:14px;">${tasks.length ? 'لا توجد مهام مطابقة' : 'لا توجد مهام — أضف مهمة جديدة'}</p></div>`;
+  } else {
+    cards.innerHTML = list.map(t=>{
+      const sc = staClass[t.status]||'s-notst';
+      const pc = priClass[t.priority]||'p-med';
+      const pf = pfClass[t.status]||'pf-notst';
+      return `<div class="card">
+        <div class="card-top">
+          <div>
+            <div class="card-name">${h(t.name)}</div>
+            <div class="card-id">${h(t.id)}${t.project ? ' · '+h(t.project) : ''}</div>
+          </div>
+        </div>
+        <div class="card-badges">
+          <span class="badge ${sc}"><span class="dot"></span>${h(t.status)}</span>
+          <span class="badge ${pc}"><span class="dot"></span>${h(t.priority)}</span>
+          ${t.category ? `<span class="badge s-notst">${h(t.category)}</span>` : ''}
+        </div>
+        <div class="card-prog">
+          <div class="prog-track"><div class="prog-fill ${pf}" style="width:${t.pct}%"></div></div>
+          <span class="prog-num">${t.pct}%</span>
+        </div>
+        <div class="card-meta">
+          ${t.start ? `<div class="card-meta-item"><span class="card-meta-lbl">البدء</span><span class="card-meta-val">${h(t.start)}</span></div>` : ''}
+          ${t.due ? `<div class="card-meta-item"><span class="card-meta-lbl">التسليم</span><span class="card-meta-val">${h(t.due)}</span></div>` : ''}
+          ${t.blocked ? `<div class="card-meta-item" style="grid-column:1/-1"><span class="card-meta-lbl">محظورة بسبب</span><span class="card-meta-val" style="color:var(--block-fg)">${h(t.blocked)}</span></div>` : ''}
+        </div>
+        ${t.notes ? `<div class="card-notes">${h(t.notes)}</div>` : ''}
+        <div class="card-actions">
+          <button class="btn card-btn-edit" onclick="openModal('${h(t.id)}')">✏️ تعديل</button>
+          <button class="btn card-btn-del" onclick="delTask('${h(t.id)}')">🗑 حذف</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
 
   // project filter
   const sel = document.getElementById('fPrj');
