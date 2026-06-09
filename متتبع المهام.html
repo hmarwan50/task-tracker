@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>متتبع المهام</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#eceef1;
+  --surface:#ffffff;
+  --header-bg:#1e2430;
+  --header-bg2:#262d3b;
+  --header-fg:#e8ebf0;
+  --header-sub:#8b93a3;
+  --row-alt:#f7f8fa;
+  --border:#e2e5ea;
+  --border-strong:#d4d8df;
+  --text:#2a2f3a;
+  --text-soft:#6a7280;
+  --grid-line:#edeff2;
+  --done-bg:#e3f4ea;  --done-fg:#1c7a48;  --done-dot:#22a866;
+  --prog-bg:#e3eefc;  --prog-fg:#1d5fbf;  --prog-dot:#3b82f6;
+  --block-bg:#fce5e5; --block-fg:#bb2d2d; --block-dot:#e04545;
+  --notst-bg:#eceef1; --notst-fg:#5f6775; --notst-dot:#9aa2b0;
+  --hi-bg:#fce5e5;  --hi-fg:#bb2d2d;  --hi-dot:#e04545;
+  --med-bg:#fdeedd; --med-fg:#b96a12; --med-dot:#ed8a2b;
+  --low-bg:#e3f4ea; --low-fg:#1c7a48; --low-dot:#22a866;
+  --font:'IBM Plex Sans Arabic',system-ui,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{background:var(--bg);font-family:var(--font);color:var(--text);-webkit-font-smoothing:antialiased;line-height:1.45;}
+
+/* ── page ── */
+.page{max-width:1280px;margin:0 auto;padding:40px 32px 80px;}
+
+/* ── topbar ── */
+.topbar{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;margin-bottom:24px;flex-wrap:wrap;}
+.title-block h1{margin:0;font-size:26px;font-weight:700;letter-spacing:-.01em;color:#171b24;}
+.title-block p{margin:6px 0 0;font-size:14px;color:var(--text-soft);font-weight:400;}
+.stats{display:flex;gap:10px;}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 16px;min-width:84px;text-align:center;}
+.stat .num{font-size:22px;font-weight:700;line-height:1.1;font-variant-numeric:tabular-nums;}
+.stat .lbl{font-size:11.5px;color:var(--text-soft);margin-top:2px;font-weight:500;}
+.stat.prog .num{color:var(--prog-dot);}
+.stat.done .num{color:var(--done-dot);}
+.stat.block .num{color:var(--block-dot);}
+
+/* ── toolbar ── */
+.toolbar{display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;}
+.toolbar input,.toolbar select{
+  height:34px;padding:0 12px;font-size:13px;font-family:var(--font);
+  border:1px solid var(--border-strong);border-radius:8px;
+  background:var(--surface);color:var(--text);outline:none;
+  transition:border-color .15s;
+}
+.toolbar input:focus,.toolbar select:focus{border-color:#3b82f6;}
+.toolbar input{min-width:210px;}
+.toolbar select{min-width:130px;cursor:pointer;}
+.btn{
+  height:34px;padding:0 14px;font-size:13px;font-family:var(--font);font-weight:600;
+  border-radius:8px;border:1px solid var(--border-strong);
+  background:var(--surface);color:var(--text);
+  cursor:pointer;display:inline-flex;align-items:center;gap:6px;
+  white-space:nowrap;transition:background .12s;
+}
+.btn:hover{background:var(--row-alt);}
+.btn-primary{background:var(--header-bg);color:var(--header-fg);border-color:var(--header-bg);}
+.btn-primary:hover{background:var(--header-bg2);}
+.btn-export{background:#1c7a48;color:#fff;border-color:#1c7a48;}
+.btn-export:hover{background:#165f38;}
+
+/* ── sheet ── */
+.sheet{background:var(--surface);border:1px solid var(--border-strong);border-radius:14px;overflow:hidden;box-shadow:0 1px 2px rgba(20,24,33,.04),0 8px 28px rgba(20,24,33,.07);}
+.sheet-scroll{overflow-x:auto;overflow-y:auto;max-height:74vh;}
+table{border-collapse:separate;border-spacing:0;width:100%;min-width:1180px;font-size:13.5px;}
+
+/* ── header ── */
+thead th{
+  position:sticky;top:0;z-index:5;
+  background:linear-gradient(180deg,var(--header-bg2),var(--header-bg));
+  color:var(--header-fg);font-weight:600;font-size:12.5px;
+  text-align:right;padding:14px 14px;white-space:nowrap;
+  border-bottom:2px solid #11151d;
+  border-inline-start:1px solid rgba(255,255,255,.05);
+}
+thead th:first-child{border-inline-start:none;}
+thead th .en{
+  display:block;font-family:var(--mono);font-size:9.5px;font-weight:400;
+  color:var(--header-sub);letter-spacing:.02em;margin-top:3px;text-transform:uppercase;
+}
+
+/* ── body rows ── */
+tbody td{
+  padding:12px 14px;border-bottom:1px solid var(--grid-line);
+  border-inline-start:1px solid var(--grid-line);
+  vertical-align:middle;color:var(--text);
+}
+tbody td:first-child{border-inline-start:none;}
+tbody tr:nth-child(even){background:var(--row-alt);}
+tbody tr:hover{background:#eef3fb;}
+tbody tr:last-child td{border-bottom:none;}
+
+.task-id{font-family:var(--mono);font-size:12px;color:var(--text-soft);white-space:nowrap;font-weight:500;}
+.task-name{font-weight:600;color:#1c212b;min-width:200px;}
+.muted{color:var(--text-soft);}
+.nowrap{white-space:nowrap;}
+.date{font-variant-numeric:tabular-nums;color:var(--text-soft);white-space:nowrap;font-size:12.5px;}
+.notes{max-width:220px;color:var(--text-soft);font-size:12.5px;line-height:1.5;}
+
+/* ── badges ── */
+.badge{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:4px 10px 4px 11px;border-radius:999px;
+  font-size:12px;font-weight:600;white-space:nowrap;line-height:1.4;
+}
+.badge .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.s-done{background:var(--done-bg);color:var(--done-fg);} .s-done .dot{background:var(--done-dot);}
+.s-prog{background:var(--prog-bg);color:var(--prog-fg);} .s-prog .dot{background:var(--prog-dot);}
+.s-block{background:var(--block-bg);color:var(--block-fg);} .s-block .dot{background:var(--block-dot);}
+.s-notst{background:var(--notst-bg);color:var(--notst-fg);} .s-notst .dot{background:var(--notst-dot);}
+.p-hi{background:var(--hi-bg);color:var(--hi-fg);} .p-hi .dot{background:var(--hi-dot);}
+.p-med{background:var(--med-bg);color:var(--med-fg);} .p-med .dot{background:var(--med-dot);}
+.p-low{background:var(--low-bg);color:var(--low-fg);} .p-low .dot{background:var(--low-dot);}
+
+/* ── progress ── */
+.prog-cell{min-width:120px;}
+.prog-wrap{display:flex;align-items:center;gap:9px;}
+.prog-track{flex:1;height:7px;background:#e7eaef;border-radius:999px;overflow:hidden;}
+.prog-fill{height:100%;border-radius:999px;transition:width .3s;}
+.prog-num{font-family:var(--mono);font-size:11.5px;font-weight:500;color:var(--text-soft);width:34px;text-align:left;font-variant-numeric:tabular-nums;}
+.pf-done{background:var(--done-dot);}
+.pf-prog{background:var(--prog-dot);}
+.pf-block{background:var(--block-dot);}
+.pf-notst{background:var(--notst-dot);}
+
+.blocked-by{font-family:var(--mono);font-size:11.5px;color:var(--block-fg);background:var(--block-bg);padding:2px 8px;border-radius:6px;white-space:nowrap;}
+.dash{color:#c2c7d0;}
+
+/* ── row action buttons ── */
+.row-acts{display:flex;gap:4px;justify-content:flex-end;}
+.act-btn{
+  width:28px;height:28px;border-radius:6px;border:1px solid transparent;
+  background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  color:var(--text-soft);transition:all .12s;flex-shrink:0;
+}
+.act-btn:hover.edit{background:#e3eefc;border-color:#b8d3f5;color:#1d5fbf;}
+.act-btn:hover.del{background:var(--block-bg);border-color:#f0c0c0;color:var(--block-fg);}
+
+/* ── empty state ── */
+.empty-row td{border-bottom:none!important;}
+.empty-cell{text-align:center;padding:56px 20px;color:var(--text-soft);}
+.empty-cell svg{margin-bottom:10px;opacity:.3;display:block;margin-inline:auto;}
+.empty-cell p{margin:0;font-size:14px;}
+
+/* ── modal ── */
+.overlay{
+  position:fixed;inset:0;background:rgba(15,20,30,.42);
+  z-index:200;display:none;align-items:center;justify-content:center;
+  padding:20px;
+}
+.overlay.show{display:flex;}
+.modal{
+  background:var(--surface);border-radius:16px;
+  border:1px solid var(--border-strong);
+  padding:28px 28px 24px;width:640px;max-width:100%;max-height:90vh;
+  overflow-y:auto;box-shadow:0 24px 64px rgba(15,20,30,.18);
+  direction:rtl;
+}
+.modal-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;}
+.modal-hd h2{margin:0;font-size:18px;font-weight:700;color:#171b24;}
+.modal-close{width:30px;height:30px;border-radius:7px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text-soft);font-size:18px;transition:background .12s;}
+.modal-close:hover{background:var(--row-alt);}
+
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px 18px;}
+.form-full{grid-column:1/-1;}
+.fg{display:flex;flex-direction:column;gap:5px;}
+.fg label{font-size:12.5px;font-weight:600;color:var(--text-soft);}
+.fg input,.fg select,.fg textarea{
+  font-family:var(--font);font-size:13.5px;
+  padding:8px 11px;border:1px solid var(--border-strong);border-radius:8px;
+  background:var(--surface);color:var(--text);outline:none;transition:border-color .15s;
+}
+.fg input:focus,.fg select:focus,.fg textarea:focus{border-color:#3b82f6;}
+.fg textarea{resize:vertical;min-height:72px;line-height:1.5;}
+.pct-row{display:flex;align-items:center;gap:10px;}
+.pct-row input[type=range]{flex:1;accent-color:var(--prog-dot);cursor:pointer;}
+.pct-val{font-family:var(--mono);font-size:13px;font-weight:500;min-width:38px;color:var(--text-soft);}
+
+.modal-ft{display:flex;gap:10px;justify-content:flex-end;margin-top:22px;padding-top:18px;border-top:1px solid var(--border);}
+
+/* ── setup section ── */
+.setup{margin-top:48px;background:var(--surface);border:1px solid var(--border-strong);border-radius:14px;padding:32px 34px;box-shadow:0 1px 2px rgba(20,24,33,.04);}
+.setup h2{margin:0 0 6px;font-size:20px;font-weight:700;display:flex;align-items:center;gap:10px;}
+.setup .sub{color:var(--text-soft);font-size:13.5px;margin:0 0 28px;}
+.setup h3{font-size:14px;font-weight:700;margin:30px 0 12px;color:#1c212b;padding-bottom:8px;border-bottom:1px solid var(--border);}
+.setup h3:first-of-type{margin-top:0;}
+.step-no{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:6px;background:var(--header-bg);color:#fff;font-size:12px;font-weight:600;font-family:var(--mono);flex-shrink:0;}
+.headers-row{display:flex;flex-wrap:wrap;gap:7px;font-family:var(--mono);}
+.headers-row .h{background:#f1f3f6;border:1px solid var(--border);border-radius:6px;padding:6px 11px;font-size:12px;display:flex;align-items:center;gap:8px;}
+.headers-row .h .col{background:var(--header-bg);color:#fff;border-radius:4px;padding:1px 6px;font-size:10px;}
+.copyhint{font-size:12px;color:var(--text-soft);margin-top:10px;font-family:var(--font);}
+.vtable{width:100%;border-collapse:collapse;font-size:13px;margin-top:4px;}
+.vtable th,.vtable td{text-align:right;padding:10px 14px;border:1px solid var(--border);vertical-align:top;}
+.vtable thead th{background:#f1f3f6;font-weight:600;font-size:12.5px;color:#3a414e;}
+.vtable td .col{font-family:var(--mono);font-size:11px;background:var(--notst-bg);border-radius:4px;padding:1px 7px;color:#3a414e;}
+.vtable code{font-family:var(--mono);font-size:12px;background:#f1f3f6;padding:2px 6px;border-radius:4px;color:#2a2f3a;}
+.pill-list{display:flex;flex-wrap:wrap;gap:6px;}
+.cf-grid{display:flex;flex-direction:column;}
+.cf-row{display:flex;align-items:center;gap:14px;padding:13px 0;border-bottom:1px solid var(--grid-line);flex-wrap:wrap;}
+.cf-row:last-child{border-bottom:none;}
+.cf-swatch{width:120px;flex-shrink:0;border-radius:8px;padding:8px 12px;font-size:12.5px;font-weight:600;text-align:center;}
+.cf-rule{font-size:13px;color:var(--text-soft);}
+.cf-rule b{color:var(--text);font-weight:600;}
+.cf-rule code{font-family:var(--mono);font-size:11.5px;background:#f1f3f6;padding:2px 7px;border-radius:4px;color:#2a2f3a;direction:ltr;display:inline-block;}
+.hex{font-family:var(--mono);font-size:11px;color:var(--text-soft);direction:ltr;}
+.footnote{margin-top:8px;font-size:12.5px;color:var(--text-soft);background:#f7f8fa;border:1px solid var(--border);border-radius:8px;padding:12px 14px;line-height:1.6;}
+.footnote b{color:var(--text);}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div class="title-block">
+      <h1>متتبع المهام</h1>
+      <p>لوحة متابعة المهام الشخصية</p>
+    </div>
+    <div class="stats" id="stats"></div>
+  </div>
+
+  <!-- TOOLBAR -->
+  <div class="toolbar">
+    <input id="q" type="search" placeholder="🔍  بحث في المهام أو المعرّف..." oninput="render()">
+    <select id="fSta" onchange="render()">
+      <option value="">كل الحالات</option>
+      <option>قيد التنفيذ</option>
+      <option>مكتملة</option>
+      <option>لم تبدأ</option>
+      <option>محظورة</option>
+    </select>
+    <select id="fPri" onchange="render()">
+      <option value="">كل الأولويات</option>
+      <option>عالية</option>
+      <option>متوسطة</option>
+      <option>منخفضة</option>
+    </select>
+    <select id="fPrj" onchange="render()">
+      <option value="">كل المشاريع</option>
+    </select>
+    <div style="margin-inline-start:auto;display:flex;gap:8px;">
+      <button class="btn btn-export" onclick="exportXlsx()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        تصدير Excel
+      </button>
+      <button class="btn btn-primary" onclick="openModal()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        مهمة جديدة
+      </button>
+    </div>
+  </div>
+
+  <!-- SHEET -->
+  <div class="sheet">
+    <div class="sheet-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>معرّف المهمة<span class="en">Task ID</span></th>
+            <th>اسم المهمة<span class="en">Task Name</span></th>
+            <th>المشروع<span class="en">Project</span></th>
+            <th>الفئة<span class="en">Category</span></th>
+            <th>الأولوية<span class="en">Priority</span></th>
+            <th>الحالة<span class="en">Status</span></th>
+            <th>تاريخ البدء<span class="en">Start Date</span></th>
+            <th>تاريخ الاستحقاق<span class="en">Due Date</span></th>
+            <th>نسبة الإنجاز<span class="en">Completion %</span></th>
+            <th>ملاحظات<span class="en">Notes</span></th>
+            <th>محظورة بسبب<span class="en">Blocked By</span></th>
+            <th style="width:68px"></th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- SETUP SECTION (from design) -->
+  <div class="setup">
+    <h2>📋 إعداد Google Sheets</h2>
+    <p class="sub">اتبع الخطوات التالية لإعادة بناء هذا الجدول داخل Google Sheets مع القوائم المنسدلة والتنسيق الشرطي.</p>
+
+    <h3><span class="step-no">1</span>&nbsp; عناوين الأعمدة — الصق في الصف الأول (A1:K1)</h3>
+    <div class="headers-row">
+      <div class="h"><span class="col">A</span>معرّف المهمة</div>
+      <div class="h"><span class="col">B</span>اسم المهمة</div>
+      <div class="h"><span class="col">C</span>المشروع</div>
+      <div class="h"><span class="col">D</span>الفئة</div>
+      <div class="h"><span class="col">E</span>الأولوية</div>
+      <div class="h"><span class="col">F</span>الحالة</div>
+      <div class="h"><span class="col">G</span>تاريخ البدء</div>
+      <div class="h"><span class="col">H</span>تاريخ الاستحقاق</div>
+      <div class="h"><span class="col">I</span>نسبة الإنجاز</div>
+      <div class="h"><span class="col">J</span>ملاحظات</div>
+      <div class="h"><span class="col">K</span>محظورة بسبب</div>
+    </div>
+    <p class="copyhint">للصق في صف واحد دفعة واحدة، انسخ السطر التالي (مفصول بـ Tab):</p>
+    <p class="footnote" style="direction:rtl">معرّف المهمة · اسم المهمة · المشروع · الفئة · الأولوية · الحالة · تاريخ البدء · تاريخ الاستحقاق · نسبة الإنجاز · ملاحظات · محظورة بسبب</p>
+
+    <h3><span class="step-no">2</span>&nbsp; القوائم المنسدلة (Data → Data validation → Dropdown)</h3>
+    <table class="vtable">
+      <thead><tr><th style="width:90px">العمود</th><th style="width:150px">الحقل</th><th>القيم المسموح بها</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><span class="col">E2:E</span></td><td>الأولوية</td>
+          <td><div class="pill-list"><span class="badge p-hi"><span class="dot"></span>عالية</span><span class="badge p-med"><span class="dot"></span>متوسطة</span><span class="badge p-low"><span class="dot"></span>منخفضة</span></div></td>
+        </tr>
+        <tr>
+          <td><span class="col">F2:F</span></td><td>الحالة</td>
+          <td><div class="pill-list"><span class="badge s-notst"><span class="dot"></span>لم تبدأ</span><span class="badge s-prog"><span class="dot"></span>قيد التنفيذ</span><span class="badge s-done"><span class="dot"></span>مكتملة</span><span class="badge s-block"><span class="dot"></span>محظورة</span></div></td>
+        </tr>
+        <tr>
+          <td><span class="col">I2:I</span></td><td>نسبة الإنجاز</td>
+          <td>قيمة رقمية بين <code>0</code> و <code>100</code> — استخدم Data validation برقم <code>بين 0 و 100</code></td>
+        </tr>
+        <tr>
+          <td><span class="col">G2:H</span></td><td>التواريخ</td>
+          <td>اضبط نوع التحقق على <code>is valid date</code> ونسّق الخلايا كتاريخ</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3><span class="step-no">3</span>&nbsp; التنسيق الشرطي (Format → Conditional formatting)</h3>
+    <p class="cf-rule" style="margin:0 0 10px"><b>عمود الحالة</b> <span class="col" style="font-family:var(--mono);font-size:11px">F2:F</span> — القاعدة: <code>Text is exactly</code></p>
+    <div class="cf-grid">
+      <div class="cf-row"><div class="cf-swatch s-done">مكتملة</div><div class="cf-rule">تعبئة <span class="hex">#E3F4EA</span> ونص <span class="hex">#1C7A48</span></div></div>
+      <div class="cf-row"><div class="cf-swatch s-prog">قيد التنفيذ</div><div class="cf-rule">تعبئة <span class="hex">#E3EEFC</span> ونص <span class="hex">#1D5FBF</span></div></div>
+      <div class="cf-row"><div class="cf-swatch s-block">محظورة</div><div class="cf-rule">تعبئة <span class="hex">#FCE5E5</span> ونص <span class="hex">#BB2D2D</span></div></div>
+      <div class="cf-row"><div class="cf-swatch s-notst">لم تبدأ</div><div class="cf-rule">تعبئة <span class="hex">#ECEEF1</span> ونص <span class="hex">#5F6775</span></div></div>
+    </div>
+
+    <p class="cf-rule" style="margin:24px 0 10px"><b>عمود الأولوية</b> <span class="col" style="font-family:var(--mono);font-size:11px">E2:E</span> — القاعدة: <code>Text is exactly</code></p>
+    <div class="cf-grid">
+      <div class="cf-row"><div class="cf-swatch p-hi">عالية</div><div class="cf-rule">تعبئة <span class="hex">#FCE5E5</span> ونص <span class="hex">#BB2D2D</span></div></div>
+      <div class="cf-row"><div class="cf-swatch p-med">متوسطة</div><div class="cf-rule">تعبئة <span class="hex">#FDEEDD</span> ونص <span class="hex">#B96A12</span></div></div>
+      <div class="cf-row"><div class="cf-swatch p-low">منخفضة</div><div class="cf-rule">تعبئة <span class="hex">#E3F4EA</span> ونص <span class="hex">#1C7A48</span></div></div>
+    </div>
+
+    <p class="cf-rule" style="margin:24px 0 10px"><b>عمود نسبة الإنجاز</b> <span class="col" style="font-family:var(--mono);font-size:11px">I2:I</span> — مقياس ألوان (Color scale)</p>
+    <div class="footnote">
+      استخدم <b>Color scale</b>: القيمة الدنيا <code>0</code> بلون <span class="hex">#FCE5E5</span>، نقطة المنتصف <code>50</code> بلون <span class="hex">#FDEEDD</span>، القيمة العليا <code>100</code> بلون <span class="hex">#E3F4EA</span>. لتأثير شريط التقدّم: <code>=REPT("█", I2/10)</code> في عمود مساعد.
+    </div>
+    <div class="footnote" style="margin-top:12px">
+      <b>تلميح — تلوين الصف بالكامل:</b> استخدم قاعدة <b>Custom formula</b> مثل <code>=$F2="محظورة"</code> وطبّقها على <code>A2:K</code>.
+    </div>
+  </div>
+
+</div><!-- /page -->
+
+<!-- ADD / EDIT MODAL -->
+<div class="overlay" id="overlay" onclick="overlayClick(event)">
+  <div class="modal" id="modal">
+    <div class="modal-hd">
+      <h2 id="modal-title">مهمة جديدة</h2>
+      <button class="modal-close" onclick="closeModal()" aria-label="إغلاق">✕</button>
+    </div>
+    <div class="form-grid">
+      <div class="fg form-full">
+        <label>اسم المهمة <span style="color:var(--block-fg)">*</span></label>
+        <input id="f-name" type="text" placeholder="مثال: تصميم الصفحة الرئيسية">
+      </div>
+      <div class="fg">
+        <label>المشروع</label>
+        <input id="f-project" type="text" placeholder="مثال: تطوير الموقع">
+      </div>
+      <div class="fg">
+        <label>الفئة</label>
+        <input id="f-category" type="text" placeholder="مثال: تصميم، برمجة، محتوى">
+      </div>
+      <div class="fg">
+        <label>الأولوية</label>
+        <select id="f-priority">
+          <option value="عالية">عالية</option>
+          <option value="متوسطة" selected>متوسطة</option>
+          <option value="منخفضة">منخفضة</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label>الحالة</label>
+        <select id="f-status">
+          <option value="لم تبدأ" selected>لم تبدأ</option>
+          <option value="قيد التنفيذ">قيد التنفيذ</option>
+          <option value="مكتملة">مكتملة</option>
+          <option value="محظورة">محظورة</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label>تاريخ البدء</label>
+        <input id="f-start" type="date">
+      </div>
+      <div class="fg">
+        <label>تاريخ الاستحقاق</label>
+        <input id="f-due" type="date">
+      </div>
+      <div class="fg form-full">
+        <label>نسبة الإنجاز — <span id="pct-lbl" style="color:var(--prog-fg);font-family:var(--mono)">0%</span></label>
+        <div class="pct-row">
+          <input id="f-pct" type="range" min="0" max="100" value="0" step="1" oninput="document.getElementById('pct-lbl').textContent=this.value+'%'">
+          <span class="pct-val" id="pct-num">0%</span>
+        </div>
+      </div>
+      <div class="fg">
+        <label>محظورة بسبب</label>
+        <input id="f-blocked" type="text" placeholder="مثال: TASK-002">
+      </div>
+      <div class="fg form-full">
+        <label>ملاحظات</label>
+        <textarea id="f-notes" placeholder="أي تفاصيل إضافية..."></textarea>
+      </div>
+    </div>
+    <div class="modal-ft">
+      <button class="btn" onclick="closeModal()">إلغاء</button>
+      <button class="btn btn-primary" onclick="saveTask()">حفظ المهمة</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── data ──────────────────────────────────────────────────────────
+const STORAGE_KEY = 'tasktracker_v1';
+const DEFAULT_TASKS = [
+  {id:'TASK-001',name:'تصميم الصفحة الرئيسية الجديدة',project:'تطوير الموقع',category:'تصميم',priority:'عالية',status:'قيد التنفيذ',start:'2026/06/01',due:'2026/06/15',pct:65,notes:'بانتظار اعتماد النصوص النهائية من فريق التسويق.',blocked:''},
+  {id:'TASK-002',name:'ربط بوابة الدفع الإلكتروني',project:'تطوير الموقع',category:'برمجة',priority:'عالية',status:'محظورة',start:'2026/06/03',due:'2026/06/20',pct:30,notes:'لا يمكن المتابعة قبل الانتهاء من تصميم صفحة الدفع.',blocked:'TASK-001'},
+  {id:'TASK-003',name:'كتابة محتوى صفحة «من نحن»',project:'التسويق',category:'محتوى',priority:'متوسطة',status:'مكتملة',start:'2026/05/25',due:'2026/06/05',pct:100,notes:'تم التسليم والاعتماد. جاهزة للنشر.',blocked:''},
+  {id:'TASK-004',name:'إعداد حملة إعلانية على وسائل التواصل',project:'التسويق',category:'إعلانات',priority:'متوسطة',status:'قيد التنفيذ',start:'2026/06/06',due:'2026/06/25',pct:45,notes:'تجهيز التصاميم البصرية وجدولة المنشورات.',blocked:''},
+  {id:'TASK-005',name:'اختبار التطبيق على الأجهزة المحمولة',project:'ضمان الجودة',category:'اختبار',priority:'منخفضة',status:'لم تبدأ',start:'2026/06/16',due:'2026/06/30',pct:0,notes:'يبدأ بعد اكتمال مرحلة التطوير الأساسية.',blocked:'TASK-001'},
+];
+
+function loadData(){
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      const parsed = JSON.parse(raw);
+      return { tasks: parsed.tasks || DEFAULT_TASKS, seq: parsed.seq || 6 };
+    }
+  } catch(e){}
+  return { tasks: DEFAULT_TASKS, seq: 6 };
+}
+
+function saveData(){
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ tasks, seq }));
+  } catch(e){}
+}
+
+const _loaded = loadData();
+let tasks = _loaded.tasks;
+let seq = _loaded.seq;
+let editId = null;
+
+// ── maps ──────────────────────────────────────────────────────────
+const staClass = {مكتملة:'s-done','قيد التنفيذ':'s-prog',محظورة:'s-block','لم تبدأ':'s-notst'};
+const priClass = {عالية:'p-hi',متوسطة:'p-med',منخفضة:'p-low'};
+const pfClass  = {مكتملة:'pf-done','قيد التنفيذ':'pf-prog',محظورة:'pf-block','لم تبدأ':'pf-notst'};
+
+function h(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ── render ────────────────────────────────────────────────────────
+function render(){
+  const q   = document.getElementById('q').value.trim().toLowerCase();
+  const fS  = document.getElementById('fSta').value;
+  const fP  = document.getElementById('fPri').value;
+  const fPr = document.getElementById('fPrj').value;
+
+  const list = tasks.filter(t=>{
+    if(q && !t.name.toLowerCase().includes(q) && !t.id.toLowerCase().includes(q) && !(t.project||'').toLowerCase().includes(q)) return false;
+    if(fS  && t.status   !== fS)  return false;
+    if(fP  && t.priority !== fP)  return false;
+    if(fPr && t.project  !== fPr) return false;
+    return true;
+  });
+
+  const tbody = document.getElementById('tbody');
+  if(!list.length){
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="12"><div class="empty-cell">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M9 9l6 6m0-6l-6 6"/></svg>
+      <p>لا توجد مهام مطابقة للفلتر</p></div></td></tr>`;
+  } else {
+    tbody.innerHTML = list.map(t=>{
+      const sc = staClass[t.status]||'s-notst';
+      const pc = priClass[t.priority]||'p-med';
+      const pf = pfClass[t.status]||'pf-notst';
+      return `<tr>
+        <td class="task-id">${h(t.id)}</td>
+        <td class="task-name">${h(t.name)}</td>
+        <td class="nowrap muted">${h(t.project)}</td>
+        <td class="muted nowrap">${h(t.category)}</td>
+        <td><span class="badge ${pc}"><span class="dot"></span>${h(t.priority)}</span></td>
+        <td><span class="badge ${sc}"><span class="dot"></span>${h(t.status)}</span></td>
+        <td class="date">${h(t.start)||'<span class="dash">—</span>'}</td>
+        <td class="date">${h(t.due)||'<span class="dash">—</span>'}</td>
+        <td class="prog-cell"><div class="prog-wrap">
+          <div class="prog-track"><div class="prog-fill ${pf}" style="width:${t.pct}%"></div></div>
+          <span class="prog-num">${t.pct}%</span>
+        </div></td>
+        <td class="notes">${h(t.notes)||'<span class="dash">—</span>'}</td>
+        <td>${t.blocked?`<span class="blocked-by">${h(t.blocked)}</span>`:'<span class="dash">—</span>'}</td>
+        <td>
+          <div class="row-acts">
+            <button class="act-btn edit" onclick="openModal('${h(t.id)}')" title="تعديل">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            </button>
+            <button class="act-btn del" onclick="delTask('${h(t.id)}')" title="حذف">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6m4-6v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+            </button>
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+
+  // stats
+  const tot   = tasks.length;
+  const prog  = tasks.filter(t=>t.status==='قيد التنفيذ').length;
+  const done  = tasks.filter(t=>t.status==='مكتملة').length;
+  const block = tasks.filter(t=>t.status==='محظورة').length;
+  document.getElementById('stats').innerHTML = `
+    <div class="stat"><div class="num">${tot}</div><div class="lbl">إجمالي</div></div>
+    <div class="stat prog"><div class="num">${prog}</div><div class="lbl">قيد التنفيذ</div></div>
+    <div class="stat done"><div class="num">${done}</div><div class="lbl">مكتملة</div></div>
+    <div class="stat block"><div class="num">${block}</div><div class="lbl">محظورة</div></div>`;
+
+  // project filter options
+  const sel = document.getElementById('fPrj');
+  const cur = sel.value;
+  const projects = [...new Set(tasks.map(t=>t.project).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">كل المشاريع</option>' +
+    projects.map(p=>`<option value="${h(p)}"${p===cur?' selected':''}>${h(p)}</option>`).join('');
+}
+
+// ── modal ─────────────────────────────────────────────────────────
+function openModal(id){
+  editId = id||null;
+  document.getElementById('modal-title').textContent = id ? 'تعديل المهمة' : 'مهمة جديدة';
+  if(id){
+    const t = tasks.find(x=>x.id===id);
+    if(!t) return;
+    document.getElementById('f-name').value     = t.name;
+    document.getElementById('f-project').value  = t.project||'';
+    document.getElementById('f-category').value = t.category||'';
+    document.getElementById('f-priority').value = t.priority;
+    document.getElementById('f-status').value   = t.status;
+    document.getElementById('f-start').value    = t.start ? t.start.replace(/\//g,'-') : '';
+    document.getElementById('f-due').value      = t.due   ? t.due.replace(/\//g,'-')   : '';
+    document.getElementById('f-pct').value      = t.pct;
+    document.getElementById('f-notes').value    = t.notes||'';
+    document.getElementById('f-blocked').value  = t.blocked||'';
+    document.getElementById('pct-lbl').textContent = t.pct+'%';
+    document.getElementById('pct-num').textContent = t.pct+'%';
+  } else {
+    ['f-name','f-project','f-category','f-start','f-due','f-notes','f-blocked'].forEach(i=>document.getElementById(i).value='');
+    document.getElementById('f-priority').value = 'متوسطة';
+    document.getElementById('f-status').value   = 'لم تبدأ';
+    document.getElementById('f-pct').value      = '0';
+    document.getElementById('pct-lbl').textContent = '0%';
+    document.getElementById('pct-num').textContent = '0%';
+  }
+  document.getElementById('overlay').classList.add('show');
+  requestAnimationFrame(()=>document.getElementById('f-name').focus());
+}
+
+function closeModal(){
+  document.getElementById('overlay').classList.remove('show');
+  editId = null;
+}
+
+function overlayClick(e){ if(e.target===document.getElementById('overlay')) closeModal(); }
+
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeModal(); });
+
+// sync slider label
+document.getElementById('f-pct').addEventListener('input',function(){
+  const v = this.value+'%';
+  document.getElementById('pct-lbl').textContent = v;
+  document.getElementById('pct-num').textContent = v;
+});
+
+function saveTask(){
+  const name = document.getElementById('f-name').value.trim();
+  if(!name){ document.getElementById('f-name').focus(); return; }
+  const fmt = v => v ? v.replace(/-/g,'/') : '';
+  const data = {
+    name,
+    project:  document.getElementById('f-project').value.trim(),
+    category: document.getElementById('f-category').value.trim(),
+    priority: document.getElementById('f-priority').value,
+    status:   document.getElementById('f-status').value,
+    start:    fmt(document.getElementById('f-start').value),
+    due:      fmt(document.getElementById('f-due').value),
+    pct:      Math.min(100,Math.max(0,parseInt(document.getElementById('f-pct').value)||0)),
+    notes:    document.getElementById('f-notes').value.trim(),
+    blocked:  document.getElementById('f-blocked').value.trim(),
+  };
+  if(editId){
+    const i = tasks.findIndex(t=>t.id===editId);
+    if(i>=0) tasks[i] = {...tasks[i],...data};
+  } else {
+    data.id = 'TASK-' + String(seq++).padStart(3,'0');
+    tasks.push(data);
+  }
+  closeModal();
+  saveData();
+  render();
+}
+
+// ── delete ────────────────────────────────────────────────────────
+function delTask(id){
+  if(!confirm('حذف هذه المهمة نهائياً؟')) return;
+  tasks = tasks.filter(t=>t.id!==id);
+  saveData();
+  render();
+}
+
+// ── export ────────────────────────────────────────────────────────
+function exportXlsx(){
+  const hdrs = ['معرّف المهمة','اسم المهمة','المشروع','الفئة','الأولوية','الحالة','تاريخ البدء','تاريخ الاستحقاق','نسبة الإنجاز','ملاحظات','محظورة بسبب'];
+  const rows = tasks.map(t=>({
+    'معرّف المهمة':t.id,
+    'اسم المهمة':t.name,
+    'المشروع':t.project,
+    'الفئة':t.category,
+    'الأولوية':t.priority,
+    'الحالة':t.status,
+    'تاريخ البدء':t.start,
+    'تاريخ الاستحقاق':t.due,
+    'نسبة الإنجاز':t.pct+'%',
+    'ملاحظات':t.notes,
+    'محظورة بسبب':t.blocked,
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows,{header:hdrs});
+  ws['!cols'] = [{wch:12},{wch:32},{wch:16},{wch:12},{wch:10},{wch:14},{wch:12},{wch:14},{wch:12},{wch:30},{wch:14}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'المهام');
+  XLSX.writeFile(wb, 'متتبع_المهام.xlsx');
+}
+
+// ── init ──────────────────────────────────────────────────────────
+render();
+</script>
+</body>
+</html>
